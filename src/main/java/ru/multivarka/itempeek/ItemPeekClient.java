@@ -16,6 +16,17 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import com.mojang.datafixers.util.Either;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
+import net.neoforged.neoforge.client.event.RenderTooltipEvent;
+import ru.multivarka.itempeek.client.tooltip.ChatItemClientTooltipComponent;
+import ru.multivarka.itempeek.client.tooltip.ChatItemTooltipComponent;
 
 @Mod(value = ItemPeek.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = ItemPeek.MODID, value = Dist.CLIENT)
@@ -41,6 +52,41 @@ public class ItemPeekClient {
     }
 
     @SubscribeEvent
+    public static void onTooltipGather(RenderTooltipEvent.GatherComponents event) {
+        if (event.getItemStack().isEmpty()) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getInstance();
+        Screen currentScreen = mc.screen;
+        if (currentScreen != null && !(currentScreen instanceof ChatScreen)) {
+            return;
+        }
+
+        List<Either<FormattedText, TooltipComponent>> elements = event.getTooltipElements();
+        if (elements.isEmpty()) {
+            return;
+        }
+
+        Either<FormattedText, TooltipComponent> first = elements.get(0);
+        if (first.right().isPresent()) {
+            return;
+        }
+
+        Optional<FormattedText> firstText = first.left();
+        if (firstText.isEmpty()) {
+            return;
+        }
+
+        FormattedText textElement = firstText.get();
+        Component title = textElement instanceof Component component
+                ? component
+                : Component.literal(textElement.getString());
+
+        elements.set(0, Either.right(new ChatItemTooltipComponent(event.getItemStack(), title)));
+    }
+
+    @SubscribeEvent
     public static void onKeyInput(InputEvent.Key event) {
         if (event.getAction() != GLFW.GLFW_PRESS) return;
 
@@ -61,4 +107,13 @@ public class ItemPeekClient {
             }
         }
     }
+
+    @EventBusSubscriber(modid = ItemPeek.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    public static class ClientModEvents {
+        @SubscribeEvent
+        public static void registerTooltipFactories(RegisterClientTooltipComponentFactoriesEvent event) {
+            event.register(ChatItemTooltipComponent.class, ChatItemClientTooltipComponent::new);
+        }
+    }
 }
+
