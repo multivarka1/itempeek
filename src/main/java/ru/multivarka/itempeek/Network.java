@@ -6,10 +6,6 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.Item;
-import net.minecraft.nbt.CompoundTag;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -62,37 +58,7 @@ public final class Network {
                 .append(itemColored)
                 .append(rightBracket);
 
-        try {
-            HoverEvent.ItemStackInfo info = null;
-            try {
-                var of = HoverEvent.ItemStackInfo.class.getDeclaredMethod("of", ItemStack.class);
-                info = (HoverEvent.ItemStackInfo) of.invoke(null, stack);
-            } catch (NoSuchMethodException e1) {
-                try {
-                    var create = HoverEvent.ItemStackInfo.class.getDeclaredMethod("create", ItemStack.class);
-                    info = (HoverEvent.ItemStackInfo) create.invoke(null, stack);
-                } catch (NoSuchMethodException e2) {
-                    try {
-                        var ctor = HoverEvent.ItemStackInfo.class.getDeclaredConstructor(ItemStack.class);
-                        ctor.setAccessible(true);
-                        info = (HoverEvent.ItemStackInfo) ctor.newInstance(stack);
-                    } catch (NoSuchMethodException e3) {
-                        try {
-                            var ctor2 = HoverEvent.ItemStackInfo.class.getDeclaredConstructor(Holder.class, int.class, CompoundTag.class);
-                            ctor2.setAccessible(true);
-                            Holder<Item> holder = BuiltInRegistries.ITEM.wrapAsHolder(stack.getItem());
-                            info = (HoverEvent.ItemStackInfo) ctor2.newInstance(holder, stack.getCount(), null);
-                        } catch (NoSuchMethodException e4) {
-                        }
-                    }
-                }
-            }
-            if (info != null) {
-                final HoverEvent.ItemStackInfo infoFinal = info;
-                shown = shown.copy().withStyle(s -> s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, infoFinal)));
-            }
-        } catch (Throwable ignored) {
-        }
+        shown = shown.copy().withStyle(s -> s.withHoverEvent(new HoverEvent.ShowItem(stack)));
 
         int count = stack.getCount();
         net.minecraft.network.chat.MutableComponent baseMsg = (count > 1)

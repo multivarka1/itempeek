@@ -1,6 +1,5 @@
 package ru.multivarka.itempeek.client.tooltip;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
@@ -22,8 +21,7 @@ public final class ChatItemClientTooltipComponent implements ClientTooltipCompon
     }
 
     @Override
-    public int getHeight() {
-        Font font = Minecraft.getInstance().font;
+    public int getHeight(Font font) {
         return Math.max(ICON_SIZE, font.lineHeight + 2);
     }
 
@@ -33,9 +31,9 @@ public final class ChatItemClientTooltipComponent implements ClientTooltipCompon
     }
 
     @Override
-    public void renderImage(Font font, int x, int y, GuiGraphics graphics) {
-        int height = Math.max(ICON_SIZE, font.lineHeight + 2);
-        int iconY = y + (height - ICON_SIZE) / 2 - 1;
+    public void renderImage(Font font, int x, int y, int width, int height, GuiGraphics graphics) {
+        int tooltipHeight = Math.max(ICON_SIZE, font.lineHeight + 2);
+        int iconY = y + (tooltipHeight - ICON_SIZE) / 2 - 1;
         graphics.renderItem(this.stack, x, iconY);
         graphics.renderItemDecorations(font, this.stack, x, iconY);
     }
