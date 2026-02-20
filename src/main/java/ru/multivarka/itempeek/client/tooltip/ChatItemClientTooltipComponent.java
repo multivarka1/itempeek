@@ -3,10 +3,8 @@ package ru.multivarka.itempeek.client.tooltip;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
-import org.joml.Matrix4f;
 
 public final class ChatItemClientTooltipComponent implements ClientTooltipComponent {
     private static final int ICON_SIZE = 16;
@@ -39,11 +37,11 @@ public final class ChatItemClientTooltipComponent implements ClientTooltipCompon
     }
 
     @Override
-    public void renderText(Font font, int x, int y, Matrix4f pose, MultiBufferSource.BufferSource buffer) {
+    public void renderText(GuiGraphics graphics, Font font, int x, int y) {
         int height = Math.max(ICON_SIZE, font.lineHeight + 2);
         int textY = y + (height - font.lineHeight) / 2;
         int textX = x + ICON_SIZE + ICON_PADDING;
-        font.drawInBatch(this.text, (float) textX, (float) textY, -1, true, pose, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+        graphics.drawString(font, this.text, textX, textY, -1, true);
     }
 }
 

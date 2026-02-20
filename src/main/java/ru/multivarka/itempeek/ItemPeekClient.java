@@ -2,7 +2,7 @@ package ru.multivarka.itempeek;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
 import org.lwjgl.glfw.GLFW;
@@ -32,6 +32,9 @@ import ru.multivarka.itempeek.client.tooltip.ChatItemTooltipComponent;
 @EventBusSubscriber(modid = ItemPeek.MODID, value = Dist.CLIENT)
 public class ItemPeekClient {
     private static KeyMapping SHOW_ITEM_KEY;
+    private static final KeyMapping.Category SHOW_ITEM_CATEGORY = KeyMapping.Category.register(
+            Identifier.fromNamespaceAndPath(ItemPeek.MODID, "itempeek")
+    );
 
     public ItemPeekClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -44,10 +47,11 @@ public class ItemPeekClient {
 
     @SubscribeEvent
     public static void registerKeys(RegisterKeyMappingsEvent event) {
+        event.registerCategory(SHOW_ITEM_CATEGORY);
         SHOW_ITEM_KEY = new KeyMapping(
                 "key.itempeek.show_item",
                 GLFW.GLFW_KEY_T,
-                "key.categories.itempeek");
+                SHOW_ITEM_CATEGORY);
         event.register(SHOW_ITEM_KEY);
     }
 
@@ -58,7 +62,7 @@ public class ItemPeekClient {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        Screen currentScreen = mc.screen;
+        var currentScreen = mc.screen;
         if (currentScreen != null && !(currentScreen instanceof ChatScreen)) {
             return;
         }
@@ -93,9 +97,8 @@ public class ItemPeekClient {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        if (Screen.hasShiftDown() && SHOW_ITEM_KEY != null) {
-            int boundKey = SHOW_ITEM_KEY.getKey().getValue();
-            if (event.getKey() != boundKey) return;
+        if ((event.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0 && SHOW_ITEM_KEY != null) {
+            if (!SHOW_ITEM_KEY.matches(event.getKeyEvent())) return;
             if (mc.screen instanceof AbstractContainerScreen<?> contScreen) {
                 Slot hovered = contScreen.getSlotUnderMouse();
                 if (hovered != null && hovered.hasItem()) {
@@ -108,7 +111,7 @@ public class ItemPeekClient {
         }
     }
 
-    @EventBusSubscriber(modid = ItemPeek.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(modid = ItemPeek.MODID, value = Dist.CLIENT)
     public static class ClientModEvents {
         @SubscribeEvent
         public static void registerTooltipFactories(RegisterClientTooltipComponentFactoriesEvent event) {

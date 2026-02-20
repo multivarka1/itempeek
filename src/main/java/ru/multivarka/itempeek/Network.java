@@ -9,9 +9,9 @@ import net.minecraft.world.item.Rarity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-@EventBusSubscriber(modid = ItemPeek.MODID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = ItemPeek.MODID)
 public final class Network {
     private Network() {}
 
@@ -66,12 +66,12 @@ public final class Network {
                 : Component.translatable("message.itempeek.shows_item", player.getName(), shown);
         Component msg = baseMsg.withStyle(ChatFormatting.GRAY);
 
-        for (ServerPlayer target : player.server.getPlayerList().getPlayers()) {
+        for (ServerPlayer target : player.level().getServer().getPlayerList().getPlayers()) {
             target.sendSystemMessage(msg);
         }
     }
 
     public static void sendShowItemToServer(int slotIndex) {
-        PacketDistributor.sendToServer(new ItemPeekPayload(slotIndex));
+        ClientPacketDistributor.sendToServer(new ItemPeekPayload(slotIndex));
     }
 }
