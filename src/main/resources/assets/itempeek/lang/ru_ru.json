@@ -2,6 +2,7 @@
   "itemGroup.itempeek": "Вкладка мода",
 
   "key.categories.itempeek": "Показ предметов",
+  "key.category.itempeek.itempeek": "Показ предметов",
   "key.itempeek.show_item": "Показать предмет (Shift+T)",
 
   "itempeek.configuration.title": "Настройки itempeek",
@@ -16,4 +17,3 @@
   "message.itempeek.shows_item": "%s показывает %s",
   "message.itempeek.shows_item_count": "%s показывает %s x%s"
 }
-

@@ -1,13 +1,10 @@
 package ru.multivarka.itempeek.client.tooltip;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
-import org.joml.Matrix4f;
 
 public final class ChatItemClientTooltipComponent implements ClientTooltipComponent {
     private static final int ICON_SIZE = 16;
@@ -22,8 +19,7 @@ public final class ChatItemClientTooltipComponent implements ClientTooltipCompon
     }
 
     @Override
-    public int getHeight() {
-        Font font = Minecraft.getInstance().font;
+    public int getHeight(Font font) {
         return Math.max(ICON_SIZE, font.lineHeight + 2);
     }
 
@@ -33,19 +29,19 @@ public final class ChatItemClientTooltipComponent implements ClientTooltipCompon
     }
 
     @Override
-    public void renderImage(Font font, int x, int y, GuiGraphics graphics) {
-        int height = Math.max(ICON_SIZE, font.lineHeight + 2);
-        int iconY = y + (height - ICON_SIZE) / 2 - 1;
-        graphics.renderItem(this.stack, x, iconY);
-        graphics.renderItemDecorations(font, this.stack, x, iconY);
+    public void extractImage(Font font, int x, int y, int width, int height, GuiGraphicsExtractor graphics) {
+        int componentHeight = Math.max(ICON_SIZE, font.lineHeight + 2);
+        int iconY = y + (componentHeight - ICON_SIZE) / 2 - 1;
+        graphics.item(this.stack, x, iconY);
+        graphics.itemDecorations(font, this.stack, x, iconY);
     }
 
     @Override
-    public void renderText(Font font, int x, int y, Matrix4f pose, MultiBufferSource.BufferSource buffer) {
+    public void extractText(GuiGraphicsExtractor graphics, Font font, int x, int y) {
         int height = Math.max(ICON_SIZE, font.lineHeight + 2);
         int textY = y + (height - font.lineHeight) / 2;
         int textX = x + ICON_SIZE + ICON_PADDING;
-        font.drawInBatch(this.text, (float) textX, (float) textY, -1, true, pose, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+        graphics.text(font, this.text, textX, textY, -1, true);
     }
 }
 

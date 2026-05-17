@@ -12,6 +12,7 @@
   "itempeek.configuration.magicNumber": "Magic Number",
 
   "key.categories.itempeek": "Show Items Mod",
+  "key.category.itempeek.itempeek": "Show Items Mod",
   "key.itempeek.show_item": "Show Held Item (Shift+T)",
 
   "message.itempeek.no_item": "You are not holding any item",
