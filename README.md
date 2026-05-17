@@ -1,6 +1,6 @@
 # Item Peek
 
-A NeoForge mod for Minecraft 1.21.1 that lets players showcase inventory items directly in chat.
+A NeoForge mod for Minecraft 26.1.2 that lets players showcase inventory items directly in chat.
 
 ## Features
 - Press **Shift + T** while hovering an item in any container screen to broadcast it.
