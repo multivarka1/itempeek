@@ -4,6 +4,7 @@
   "key.categories.itempeek": "Показ предметов",
   "key.category.itempeek.itempeek": "Показ предметов",
   "key.itempeek.show_item": "Показать предмет (Shift+T)",
+  "key.itempeek.insert_item": "Вставить предмет в чат (Shift+Y)",
 
   "itempeek.configuration.title": "Настройки itempeek",
   "itempeek.configuration.section.itempeek.common.toml": "Настройки itempeek",

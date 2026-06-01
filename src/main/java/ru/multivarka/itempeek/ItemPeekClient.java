@@ -14,6 +14,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
@@ -35,6 +36,8 @@ public class ItemPeekClient {
     private static final KeyMapping.Category ITEMPEEK_CATEGORY =
             new KeyMapping.Category(Identifier.fromNamespaceAndPath(ItemPeek.MODID, "itempeek"));
     private static KeyMapping SHOW_ITEM_KEY;
+    private static KeyMapping INSERT_ITEM_KEY;
+    private static String pendingChatMarker;
 
     public ItemPeekClient(IEventBus modEventBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -44,6 +47,7 @@ public class ItemPeekClient {
         modEventBus.addListener(ItemPeekClient::registerTooltipFactories);
         NeoForge.EVENT_BUS.addListener(ItemPeekClient::onTooltipGather);
         NeoForge.EVENT_BUS.addListener(ItemPeekClient::onKeyInput);
+        NeoForge.EVENT_BUS.addListener(ItemPeekClient::onClientTick);
     }
 
     static void onClientSetup(FMLClientSetupEvent event) {
@@ -56,7 +60,12 @@ public class ItemPeekClient {
                 "key.itempeek.show_item",
                 GLFW.GLFW_KEY_T,
                 ITEMPEEK_CATEGORY);
+        INSERT_ITEM_KEY = new KeyMapping(
+                "key.itempeek.insert_item",
+                GLFW.GLFW_KEY_Y,
+                ITEMPEEK_CATEGORY);
         event.register(SHOW_ITEM_KEY);
+        event.register(INSERT_ITEM_KEY);
     }
 
     public static void onTooltipGather(RenderTooltipEvent.GatherComponents event) {
@@ -99,23 +108,45 @@ public class ItemPeekClient {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        if ((event.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0 && SHOW_ITEM_KEY != null) {
-            int boundKey = SHOW_ITEM_KEY.getKey().getValue();
-            if (event.getKey() != boundKey) return;
-            if (mc.screen instanceof AbstractContainerScreen<?> contScreen) {
-                Slot hovered = contScreen.getHoveredSlot();
-                if (hovered != null && hovered.hasItem()) {
-                    int menuIndex = contScreen.getMenu().slots.indexOf(hovered);
-                    if (menuIndex >= 0) {
-                        sendShowItemToServer(menuIndex);
-                    }
-                }
-            }
+        if ((event.getModifiers() & GLFW.GLFW_MOD_SHIFT) == 0) return;
+        if (!(mc.screen instanceof AbstractContainerScreen<?> contScreen)) return;
+
+        Slot hovered = contScreen.getHoveredSlot();
+        if (hovered == null || !hovered.hasItem()) return;
+
+        int menuIndex = contScreen.getMenu().slots.indexOf(hovered);
+        if (menuIndex < 0) return;
+
+        if (matches(event, SHOW_ITEM_KEY)) {
+            sendShowItemToServer(menuIndex);
+        } else if (matches(event, INSERT_ITEM_KEY)) {
+            insertItemIntoChat(mc, menuIndex, hovered);
         }
+    }
+
+    private static boolean matches(InputEvent.Key event, KeyMapping keyMapping) {
+        return keyMapping != null && event.getKey() == keyMapping.getKey().getValue();
     }
 
     private static void sendShowItemToServer(int slotIndex) {
         ClientPacketDistributor.sendToServer(new ItemPeekPayload(slotIndex));
+    }
+
+    private static void insertItemIntoChat(Minecraft mc, int slotIndex, Slot slot) {
+        String marker = "[" + slot.getItem().getHoverName().getString() + "]";
+        ClientPacketDistributor.sendToServer(new InsertItemPayload(slotIndex, marker));
+        pendingChatMarker = marker;
+        mc.setScreen(null);
+    }
+
+    public static void onClientTick(ClientTickEvent.Post event) {
+        if (pendingChatMarker == null) {
+            return;
+        }
+
+        String marker = pendingChatMarker;
+        pendingChatMarker = null;
+        Minecraft.getInstance().setScreen(new ItemPeekChatScreen(marker));
     }
 
     public static void registerTooltipFactories(RegisterClientTooltipComponentFactoriesEvent event) {

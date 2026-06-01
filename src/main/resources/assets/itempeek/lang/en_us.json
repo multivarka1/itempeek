@@ -14,6 +14,7 @@
   "key.categories.itempeek": "Show Items Mod",
   "key.category.itempeek.itempeek": "Show Items Mod",
   "key.itempeek.show_item": "Show Held Item (Shift+T)",
+  "key.itempeek.insert_item": "Insert Item into Chat (Shift+Y)",
 
   "message.itempeek.no_item": "You are not holding any item",
   "message.itempeek.shows_item": "%s shows %s",
