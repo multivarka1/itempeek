@@ -4,6 +4,7 @@ import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.HoverEvent;
@@ -11,12 +12,19 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Rarity;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.text.SimpleDateFormat;
 import java.util.Map;
 import java.util.Collection;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -96,9 +104,115 @@ public final class Network {
 
         String before = rawText.substring(0, markerIndex);
         String after = rawText.substring(markerIndex + pending.marker().length());
-        event.setMessage(Component.literal(before)
+        Component message = Component.literal(before)
                 .append(createShownItem(pending.stack(), false))
-                .append(after));
+                .append(after);
+
+        if (broadcastBeautifiedChatMessage(event.getPlayer(), message)) {
+            event.setCanceled(true);
+            return;
+        }
+
+        event.setMessage(message);
+    }
+
+    private static boolean broadcastBeautifiedChatMessage(ServerPlayer player, Component message) {
+        if (!ModList.get().isLoaded("beautifiedchatserver")) {
+            return false;
+        }
+
+        try {
+            Component formatted = createBeautifiedChatMessage(player, message);
+            player.level().getServer().getPlayerList().broadcastSystemMessage(formatted, false);
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            ItemPeek.LOGGER.warn("Unable to preserve item hover in Beautified Chat Server message", exception);
+            return false;
+        }
+    }
+
+    private static Component createBeautifiedChatMessage(ServerPlayer player, Component chatMessage)
+            throws ReflectiveOperationException {
+        String username = player.getName().getString();
+        String timestamp = new SimpleDateFormat(getBeautifiedStringConfig("timestampFormat"))
+                .format(new Date());
+        MutableComponent result = Component.literal("");
+
+        for (String segment : getBeautifiedStringConfig("chatMessageFormat").split("%", -1)) {
+            ChatFormatting colour = getBeautifiedColour(segment, username);
+            Component piece;
+            if (segment.equalsIgnoreCase("timestamp")) {
+                piece = Component.literal(timestamp);
+            } else if (segment.equalsIgnoreCase("username")) {
+                piece = Component.literal(createBeautifiedUsername(username));
+            } else if (segment.equalsIgnoreCase("chatmessage")) {
+                piece = chatMessage.copy();
+            } else {
+                piece = Component.literal(segment);
+            }
+
+            result.append(piece.copy().withStyle(colour));
+        }
+
+        return result;
+    }
+
+    private static String createBeautifiedUsername(String username) throws ReflectiveOperationException {
+        if (!getBeautifiedBooleanConfig("showRankTitles")) {
+            return username;
+        }
+
+        Optional<?> rank = getBeautifiedRank(username);
+        if (rank.isEmpty()) {
+            return username;
+        }
+
+        String rankTitle = getBeautifiedStringConfig("rankTitleFormat")
+                .replace("%rank", capitalizeEveryWord(rank.get().toString()));
+        return rankTitle + username;
+    }
+
+    private static String getBeautifiedStringConfig(String fieldName) throws ReflectiveOperationException {
+        return getBeautifiedConfigField(fieldName).get(null).toString();
+    }
+
+    private static boolean getBeautifiedBooleanConfig(String fieldName) throws ReflectiveOperationException {
+        return getBeautifiedConfigField(fieldName).getBoolean(null);
+    }
+
+    private static Field getBeautifiedConfigField(String fieldName) throws ReflectiveOperationException {
+        return Class.forName("com.natamus.beautifiedchatserver_common_neoforge.config.ConfigHandler")
+                .getField(fieldName);
+    }
+
+    private static ChatFormatting getBeautifiedColour(String segment, String username) throws ReflectiveOperationException {
+        Method method = Class.forName("com.natamus.beautifiedchatserver_common_neoforge.util.Util")
+                .getMethod("getColour", String.class, String.class);
+        return (ChatFormatting) method.invoke(null, segment, username);
+    }
+
+    private static Optional<?> getBeautifiedRank(String username) throws ReflectiveOperationException {
+        Method method = Class.forName("com.natamus.beautifiedchatserver_common_neoforge.util.Util")
+                .getMethod("getRankOfPlayer", String.class);
+        return (Optional<?>) method.invoke(null, username);
+    }
+
+    private static String capitalizeEveryWord(String value) {
+        String[] words = value.replace('_', ' ').split("\\s+");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            if (!result.isEmpty()) {
+                result.append(' ');
+            }
+            result.append(word.substring(0, 1).toUpperCase(Locale.ROOT));
+            if (word.length() > 1) {
+                result.append(word.substring(1).toLowerCase(Locale.ROOT));
+            }
+        }
+        return result.toString();
     }
 
     private static void sendPrivateItemMessage(ServerPlayer sender, String targetsText, String message) {

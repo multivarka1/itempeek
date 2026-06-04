@@ -1,5 +1,6 @@
 package ru.multivarka.itempeek;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
@@ -18,6 +19,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.neoforged.neoforge.common.NeoForge;
 import java.util.List;
 import java.util.Optional;
@@ -58,10 +61,16 @@ public class ItemPeekClient {
         event.registerCategory(ITEMPEEK_CATEGORY);
         SHOW_ITEM_KEY = new KeyMapping(
                 "key.itempeek.show_item",
+                KeyConflictContext.GUI,
+                KeyModifier.SHIFT,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_T,
                 ITEMPEEK_CATEGORY);
         INSERT_ITEM_KEY = new KeyMapping(
                 "key.itempeek.insert_item",
+                KeyConflictContext.GUI,
+                KeyModifier.SHIFT,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_Y,
                 ITEMPEEK_CATEGORY);
         event.register(SHOW_ITEM_KEY);
@@ -105,10 +114,11 @@ public class ItemPeekClient {
     public static void onKeyInput(InputEvent.Key event) {
         if (event.getAction() != GLFW.GLFW_PRESS) return;
 
+        normalizeLegacyKeyModifiers();
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        if ((event.getModifiers() & GLFW.GLFW_MOD_SHIFT) == 0) return;
         if (!(mc.screen instanceof AbstractContainerScreen<?> contScreen)) return;
 
         Slot hovered = contScreen.getHoveredSlot();
@@ -125,7 +135,20 @@ public class ItemPeekClient {
     }
 
     private static boolean matches(InputEvent.Key event, KeyMapping keyMapping) {
-        return keyMapping != null && event.getKey() == keyMapping.getKey().getValue();
+        return keyMapping != null && keyMapping.isActiveAndMatches(InputConstants.Type.KEYSYM.getOrCreate(event.getKey()));
+    }
+
+    private static void normalizeLegacyKeyModifiers() {
+        normalizeLegacyKeyModifier(SHOW_ITEM_KEY, GLFW.GLFW_KEY_T);
+        normalizeLegacyKeyModifier(INSERT_ITEM_KEY, GLFW.GLFW_KEY_Y);
+    }
+
+    private static void normalizeLegacyKeyModifier(KeyMapping keyMapping, int defaultKey) {
+        if (keyMapping != null
+                && keyMapping.getKeyModifier() == KeyModifier.NONE
+                && keyMapping.getKey().getValue() == defaultKey) {
+            keyMapping.setKeyModifierAndCode(KeyModifier.SHIFT, keyMapping.getKey());
+        }
     }
 
     private static void sendShowItemToServer(int slotIndex) {

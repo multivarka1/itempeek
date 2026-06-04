@@ -2,6 +2,7 @@ package ru.multivarka.itempeek;
 
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.bus.api.IEventBus;
@@ -14,7 +15,7 @@ public class ItemPeek {
 
     public ItemPeek(IEventBus modEventBus, ModContainer container) {
         modEventBus.addListener(Network::registerPayloads);
-        NeoForge.EVENT_BUS.addListener(Network::onServerChat);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, Network::onServerChat);
         NeoForge.EVENT_BUS.addListener(Network::onPlayerLoggedOut);
     }
 }
