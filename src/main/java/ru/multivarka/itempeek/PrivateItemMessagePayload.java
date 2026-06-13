@@ -3,11 +3,11 @@ package ru.multivarka.itempeek;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record PrivateItemMessagePayload(String targets, String message) implements CustomPacketPayload {
     public static final Type<PrivateItemMessagePayload> TYPE =
-            new Type<>(Identifier.fromNamespaceAndPath(ItemPeek.MODID, "private_item_message"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(ItemPeek.MODID, "private_item_message"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, PrivateItemMessagePayload> CODEC =
             new StreamCodec<RegistryFriendlyByteBuf, PrivateItemMessagePayload>() {

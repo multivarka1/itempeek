@@ -2,7 +2,7 @@ package ru.multivarka.itempeek;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,7 +13,7 @@ public final class ItemPeekChatScreen extends ChatScreen {
     private final String marker;
 
     public ItemPeekChatScreen(String marker) {
-        super(marker + " ", false);
+        super(marker + " ");
         this.marker = marker;
     }
 
@@ -30,12 +30,12 @@ public final class ItemPeekChatScreen extends ChatScreen {
             Minecraft.getInstance().gui.getChat().addRecentChat(normalized);
         }
 
-        ClientPacketDistributor.sendToServer(new PrivateItemMessagePayload(matcher.group(2), matcher.group(3)));
+        PacketDistributor.sendToServer(new PrivateItemMessagePayload(matcher.group(2), matcher.group(3)));
     }
 
     @Override
     public void removed() {
-        ClientPacketDistributor.sendToServer(ClearPendingItemPayload.INSTANCE);
+        PacketDistributor.sendToServer(ClearPendingItemPayload.INSTANCE);
         super.removed();
     }
 }
