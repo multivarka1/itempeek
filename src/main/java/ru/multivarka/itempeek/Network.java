@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Network {
+    private static final int MAX_SHOW_ITEM_HOVER_COUNT = 99;
     private static final Map<UUID, PendingItem> PENDING_ITEMS = new ConcurrentHashMap<>();
 
     private Network() {}
@@ -276,7 +277,8 @@ public final class Network {
                 .append(itemColored)
                 .append(rightBracket);
 
-        ItemStackTemplate template = ItemStackTemplate.fromNonEmptyStack(stack);
+        int hoverCount = Math.min(stack.getCount(), Math.min(stack.getMaxStackSize(), MAX_SHOW_ITEM_HOVER_COUNT));
+        ItemStackTemplate template = ItemStackTemplate.fromNonEmptyStack(stack).withCount(hoverCount);
         shown = shown.copy().withStyle(s -> s.withHoverEvent(new HoverEvent.ShowItem(template)));
         if (includeCount && stack.getCount() > 1) {
             shown = shown.copy().append(Component.literal(" x" + stack.getCount())
