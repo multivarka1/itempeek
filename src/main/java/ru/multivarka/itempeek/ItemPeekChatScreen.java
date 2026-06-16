@@ -1,6 +1,5 @@
 package ru.multivarka.itempeek;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
@@ -27,7 +26,7 @@ public final class ItemPeekChatScreen extends ChatScreen {
         }
 
         if (addToRecent) {
-            Minecraft.getInstance().gui.getChat().addRecentChat(normalized);
+            this.minecraft.gui.hud.getChat().addRecentChat(normalized);
         }
 
         ClientPacketDistributor.sendToServer(new PrivateItemMessagePayload(matcher.group(2), matcher.group(3)));

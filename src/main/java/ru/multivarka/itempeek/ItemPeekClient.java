@@ -83,7 +83,7 @@ public class ItemPeekClient {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        Screen currentScreen = mc.screen;
+        Screen currentScreen = mc.gui.screen();
         if (currentScreen != null && !(currentScreen instanceof ChatScreen)) {
             return;
         }
@@ -119,7 +119,7 @@ public class ItemPeekClient {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        if (!(mc.screen instanceof AbstractContainerScreen<?> contScreen)) return;
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen<?> contScreen)) return;
 
         Slot hovered = contScreen.getHoveredSlot();
         if (hovered == null || !hovered.hasItem()) return;
@@ -159,7 +159,7 @@ public class ItemPeekClient {
         String marker = "[" + slot.getItem().getHoverName().getString() + "]";
         ClientPacketDistributor.sendToServer(new InsertItemPayload(slotIndex, marker));
         pendingChatMarker = marker;
-        mc.setScreen(null);
+        mc.gui.setScreen(null);
     }
 
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -169,7 +169,7 @@ public class ItemPeekClient {
 
         String marker = pendingChatMarker;
         pendingChatMarker = null;
-        Minecraft.getInstance().setScreen(new ItemPeekChatScreen(marker));
+        Minecraft.getInstance().gui.setScreen(new ItemPeekChatScreen(marker));
     }
 
     public static void registerTooltipFactories(RegisterClientTooltipComponentFactoriesEvent event) {
