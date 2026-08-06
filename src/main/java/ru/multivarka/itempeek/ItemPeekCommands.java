@@ -7,7 +7,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import ru.multivarka.itempeek.chat.PrivateMessageCommandParser;
 import ru.multivarka.itempeek.config.ItemPeekConfigService;
 import ru.multivarka.itempeek.config.ItemPeekConfigSnapshot;

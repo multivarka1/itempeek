@@ -19,7 +19,7 @@ public final class ItemPeekConfigService {
     private ItemPeekConfigService() {}
 
     public static synchronized void initialize(MinecraftServer server) {
-        path = server.getServerDirectory().resolve("serverconfig").resolve("itempeek-server.properties");
+        path = server.getServerDirectory().toPath().resolve("serverconfig").resolve("itempeek-server.properties");
         reload();
     }
     public static ItemPeekConfigSnapshot snapshot() { return snapshot; }

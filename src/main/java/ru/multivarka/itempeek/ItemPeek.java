@@ -2,6 +2,7 @@ package ru.multivarka.itempeek;
 
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.common.MinecraftForge;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/mods.toml file
@@ -13,5 +14,6 @@ public class ItemPeek {
     // Forge requires a no-arg constructor for @Mod classes
     public ItemPeek() {
         Network.init();
+        MinecraftForge.EVENT_BUS.addListener(ItemPeekCommands::register);
     }
 }

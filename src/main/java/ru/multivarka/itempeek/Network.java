@@ -45,8 +45,13 @@ public final class Network {
             .clientAcceptedVersions(s -> true)
             .serverAcceptedVersions(s -> true)
             .simpleChannel();
+    private static final ru.multivarka.itempeek.spam.ItemPeekRateLimiter LIMITER = new ru.multivarka.itempeek.spam.ItemPeekRateLimiter();
 
     private Network() {}
+
+    public static void reset(UUID id) { LIMITER.clear(id); }
+    public static void resetAll() { LIMITER.clearAll(); }
+    public static int stateCount(UUID id) { return LIMITER.count(id); }
 
     public static void init() {
         int id = 0;
