@@ -15,6 +15,12 @@
 
   "message.itempeek.no_item": "Нет предмета под курсором",
   "message.itempeek.shows_item": "%s показывает %s",
-  "message.itempeek.shows_item_count": "%s показывает %s x%s"
+  "message.itempeek.shows_item_count": "%s показывает %s x%s",
+  "message.itempeek.disabled": "Эта функция Item Peek отключена сервером",
+  "message.itempeek.cooldown": "Подождите перед повторной публикацией предмета",
+  "message.itempeek.rate_limit": "Превышен лимит Item Peek",
+  "message.itempeek.duplicate": "Такое сообщение о предмете уже недавно отправлялось",
+  "message.itempeek.pending_expired": "Подготовленный предмет устарел",
+  "message.itempeek.invalid_target": "Недопустимый получатель личного сообщения"
 }
 

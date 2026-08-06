@@ -4,11 +4,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import ru.multivarka.itempeek.chat.ParsedPrivateMessage;
+import ru.multivarka.itempeek.chat.PrivateMessageCommandParser;
+import ru.multivarka.itempeek.config.ItemPeekConfigSnapshot;
+import java.util.Arrays;
 
 public final class ItemPeekChatScreen extends ChatScreen {
-    private static final Pattern PRIVATE_MESSAGE = Pattern.compile("^/(msg|tell|w)\\s+(\\S+)\\s+(.+)$");
+    private static final java.util.Set<String> DEFAULT_ALIASES = java.util.Set.of("msg", "tell", "w", "minecraft:msg", "minecraft:tell", "minecraft:w");
 
     private final String marker;
 
@@ -20,8 +22,8 @@ public final class ItemPeekChatScreen extends ChatScreen {
     @Override
     public void handleChatInput(String message, boolean addToRecent) {
         String normalized = normalizeChatMessage(message);
-        Matcher matcher = PRIVATE_MESSAGE.matcher(normalized);
-        if (!matcher.matches() || !matcher.group(3).contains(this.marker)) {
+        ParsedPrivateMessage parsed = PrivateMessageCommandParser.parse(normalized, DEFAULT_ALIASES).orElse(null);
+        if (parsed == null || !parsed.message().contains(this.marker)) {
             super.handleChatInput(message, addToRecent);
             return;
         }
@@ -30,7 +32,7 @@ public final class ItemPeekChatScreen extends ChatScreen {
             Minecraft.getInstance().gui.getChat().addRecentChat(normalized);
         }
 
-        PacketDistributor.sendToServer(new PrivateItemMessagePayload(matcher.group(2), matcher.group(3)));
+        PacketDistributor.sendToServer(new PrivateItemMessagePayload(parsed.target(), parsed.message()));
     }
 
     @Override

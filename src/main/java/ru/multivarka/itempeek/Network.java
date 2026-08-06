@@ -12,292 +12,47 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.text.SimpleDateFormat;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import ru.multivarka.itempeek.compat.BeautifiedChatCompat;
+import ru.multivarka.itempeek.config.ItemPeekConfigService;
+import ru.multivarka.itempeek.config.ItemPeekConfigSnapshot;
+import ru.multivarka.itempeek.spam.ItemPeekRateLimiter;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @EventBusSubscriber(modid = ItemPeek.MODID, bus = EventBusSubscriber.Bus.MOD)
 public final class Network {
-    private static final int MAX_SHOW_ITEM_HOVER_COUNT = 99;
-    private static final Map<UUID, PendingItem> PENDING_ITEMS = new ConcurrentHashMap<>();
-
-    private Network() {}
-
-    public static void init() {
+    private static final int MAX_SHOW_ITEM_HOVER_COUNT=99;
+    private static final Map<UUID,PendingItem> PENDING=new ConcurrentHashMap<>();
+    private static final ItemPeekRateLimiter LIMITER=new ItemPeekRateLimiter();
+    private static final BeautifiedChatCompat BEAUTIFIED=new BeautifiedChatCompat();
+    private Network(){}
+    public static void init(){}
+    @SubscribeEvent public static void registerPayloads(RegisterPayloadHandlersEvent event){var r=event.registrar(ItemPeek.MODID);
+        r.playToServer(ItemPeekPayload.TYPE,ItemPeekPayload.CODEC,(m,c)->c.enqueueWork(()->handleShowItem((ServerPlayer)c.player(),m.slotIndex())));
+        r.playToServer(InsertItemPayload.TYPE,InsertItemPayload.CODEC,(m,c)->c.enqueueWork(()->prepare((ServerPlayer)c.player(),m.slotIndex(),m.marker())));
+        r.playToServer(PrivateItemMessagePayload.TYPE,PrivateItemMessagePayload.CODEC,(m,c)->c.enqueueWork(()->privateMessage((ServerPlayer)c.player(),m.targets(),m.message())));
+        r.playToServer(ClearPendingItemPayload.TYPE,ClearPendingItemPayload.CODEC,(m,c)->c.enqueueWork(()->PENDING.remove(c.player().getUUID())));
     }
-
-    @SubscribeEvent
-    public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(ItemPeek.MODID);
-        registrar.playToServer(ItemPeekPayload.TYPE, ItemPeekPayload.CODEC, (msg, ctx) -> {
-            var player = (ServerPlayer) ctx.player();
-            ctx.enqueueWork(() -> handleShowItem(player, msg.slotIndex()));
-        });
-        registrar.playToServer(InsertItemPayload.TYPE, InsertItemPayload.CODEC, (msg, ctx) -> {
-            var player = (ServerPlayer) ctx.player();
-            ctx.enqueueWork(() -> prepareInsertedItem(player, msg.slotIndex(), msg.marker()));
-        });
-        registrar.playToServer(PrivateItemMessagePayload.TYPE, PrivateItemMessagePayload.CODEC, (msg, ctx) -> {
-            var player = (ServerPlayer) ctx.player();
-            ctx.enqueueWork(() -> sendPrivateItemMessage(player, msg.targets(), msg.message()));
-        });
-        registrar.playToServer(ClearPendingItemPayload.TYPE, ClearPendingItemPayload.CODEC, (msg, ctx) -> {
-            var player = (ServerPlayer) ctx.player();
-            ctx.enqueueWork(() -> PENDING_ITEMS.remove(player.getUUID()));
-        });
-    }
-
-    private static void handleShowItem(ServerPlayer player, int slotIndex) {
-        if (slotIndex < 0 || slotIndex >= player.containerMenu.slots.size()) {
-            return;
-        }
-
-        ItemStack stack = player.containerMenu.getSlot(slotIndex).getItem();
-        if (stack.isEmpty()) {
-            player.sendSystemMessage(Component.translatable("message.itempeek.no_item").withStyle(ChatFormatting.RED));
-            return;
-        }
-
-        Component shown = createShownItem(stack, true, false);
-
-        int count = stack.getCount();
-        MutableComponent baseMsg = (count > 1)
-                ? Component.translatable("message.itempeek.shows_item_count", player.getName(), shown, count)
-                : Component.translatable("message.itempeek.shows_item", player.getName(), shown);
-        Component msg = baseMsg.withStyle(ChatFormatting.GRAY);
-
-        for (ServerPlayer target : player.server.getPlayerList().getPlayers()) {
-            target.sendSystemMessage(msg);
-        }
-    }
-
-    private static void prepareInsertedItem(ServerPlayer player, int slotIndex, String marker) {
-        if (slotIndex < 0 || slotIndex >= player.containerMenu.slots.size()) {
-            return;
-        }
-
-        ItemStack stack = player.containerMenu.getSlot(slotIndex).getItem();
-        if (stack.isEmpty() || marker.isBlank() || marker.length() > 256) {
-            return;
-        }
-
-        PENDING_ITEMS.put(player.getUUID(), new PendingItem(stack.copy(), marker));
-    }
-
-    public static void onServerChat(ServerChatEvent event) {
-        PendingItem pending = PENDING_ITEMS.remove(event.getPlayer().getUUID());
-        if (pending == null) {
-            return;
-        }
-
-        String rawText = event.getRawText();
-        int markerIndex = rawText.indexOf(pending.marker());
-        if (markerIndex < 0) {
-            return;
-        }
-
-        String before = rawText.substring(0, markerIndex);
-        String after = rawText.substring(markerIndex + pending.marker().length());
-        Component message = Component.literal(before)
-                .append(createShownItem(pending.stack(), false))
-                .append(after);
-
-        if (broadcastBeautifiedChatMessage(event.getPlayer(), message)) {
-            event.setCanceled(true);
-            return;
-        }
-
-        event.setMessage(message);
-    }
-
-    private static boolean broadcastBeautifiedChatMessage(ServerPlayer player, Component message) {
-        if (!ModList.get().isLoaded("beautifiedchatserver")) {
-            return false;
-        }
-
-        try {
-            Component formatted = createBeautifiedChatMessage(player, message);
-            player.server.getPlayerList().broadcastSystemMessage(formatted, false);
-            return true;
-        } catch (ReflectiveOperationException | RuntimeException exception) {
-            ItemPeek.LOGGER.warn("Unable to preserve item hover in Beautified Chat Server message", exception);
-            return false;
-        }
-    }
-
-    private static Component createBeautifiedChatMessage(ServerPlayer player, Component chatMessage)
-            throws ReflectiveOperationException {
-        String username = player.getName().getString();
-        String timestamp = new SimpleDateFormat(getBeautifiedStringConfig("timestampFormat"))
-                .format(new Date());
-        MutableComponent result = Component.literal("");
-
-        for (String segment : getBeautifiedStringConfig("chatMessageFormat").split("%", -1)) {
-            ChatFormatting colour = getBeautifiedColour(segment, username);
-            Component piece;
-            if (segment.equalsIgnoreCase("timestamp")) {
-                piece = Component.literal(timestamp);
-            } else if (segment.equalsIgnoreCase("username")) {
-                piece = Component.literal(createBeautifiedUsername(username));
-            } else if (segment.equalsIgnoreCase("chatmessage")) {
-                piece = chatMessage.copy();
-            } else {
-                piece = Component.literal(segment);
-            }
-
-            result.append(piece.copy().withStyle(colour));
-        }
-
-        return result;
-    }
-
-    private static String createBeautifiedUsername(String username) throws ReflectiveOperationException {
-        if (!getBeautifiedBooleanConfig("showRankTitles")) {
-            return username;
-        }
-
-        Optional<?> rank = getBeautifiedRank(username);
-        if (rank.isEmpty()) {
-            return username;
-        }
-
-        String rankTitle = getBeautifiedStringConfig("rankTitleFormat")
-                .replace("%rank", capitalizeEveryWord(rank.get().toString()));
-        return rankTitle + username;
-    }
-
-    private static String getBeautifiedStringConfig(String fieldName) throws ReflectiveOperationException {
-        return getBeautifiedConfigField(fieldName).get(null).toString();
-    }
-
-    private static boolean getBeautifiedBooleanConfig(String fieldName) throws ReflectiveOperationException {
-        return getBeautifiedConfigField(fieldName).getBoolean(null);
-    }
-
-    private static Field getBeautifiedConfigField(String fieldName) throws ReflectiveOperationException {
-        return Class.forName("com.natamus.beautifiedchatserver_common_neoforge.config.ConfigHandler")
-                .getField(fieldName);
-    }
-
-    private static ChatFormatting getBeautifiedColour(String segment, String username) throws ReflectiveOperationException {
-        Method method = Class.forName("com.natamus.beautifiedchatserver_common_neoforge.util.Util")
-                .getMethod("getColour", String.class, String.class);
-        return (ChatFormatting) method.invoke(null, segment, username);
-    }
-
-    private static Optional<?> getBeautifiedRank(String username) throws ReflectiveOperationException {
-        Method method = Class.forName("com.natamus.beautifiedchatserver_common_neoforge.util.Util")
-                .getMethod("getRankOfPlayer", String.class);
-        return (Optional<?>) method.invoke(null, username);
-    }
-
-    private static String capitalizeEveryWord(String value) {
-        String[] words = value.replace('_', ' ').split("\\s+");
-        StringBuilder result = new StringBuilder();
-        for (String word : words) {
-            if (word.isEmpty()) {
-                continue;
-            }
-            if (!result.isEmpty()) {
-                result.append(' ');
-            }
-            result.append(word.substring(0, 1).toUpperCase(Locale.ROOT));
-            if (word.length() > 1) {
-                result.append(word.substring(1).toLowerCase(Locale.ROOT));
-            }
-        }
-        return result.toString();
-    }
-
-    private static void sendPrivateItemMessage(ServerPlayer sender, String targetsText, String message) {
-        PendingItem pending = PENDING_ITEMS.remove(sender.getUUID());
-        if (pending == null || targetsText.isBlank() || message.length() > 256) {
-            return;
-        }
-
-        int markerIndex = message.indexOf(pending.marker());
-        if (markerIndex < 0) {
-            return;
-        }
-
-        Component content = Component.literal(message.substring(0, markerIndex))
-                .append(createShownItem(pending.stack(), false))
-                .append(message.substring(markerIndex + pending.marker().length()));
-        try {
-            var source = sender.createCommandSourceStack();
-            var selector = EntityArgument.players().parse(new StringReader(targetsText), source);
-            Collection<ServerPlayer> targets = selector.findPlayers(source);
-            if (targets.isEmpty()) {
-                throw EntityArgument.NO_PLAYERS_FOUND.create();
-            }
-
-            ChatType.Bound incoming = ChatType.bind(ChatType.MSG_COMMAND_INCOMING, source);
-            for (ServerPlayer target : targets) {
-                ChatType.Bound outgoing = ChatType.bind(ChatType.MSG_COMMAND_OUTGOING, source)
-                        .withTargetName(target.getDisplayName());
-                sender.sendSystemMessage(outgoing.decorate(content));
-                target.sendSystemMessage(incoming.decorate(content));
-            }
-        } catch (CommandSyntaxException exception) {
-            sender.sendSystemMessage(Component.literal(exception.getMessage()).withStyle(ChatFormatting.RED));
-        }
-    }
-
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        PENDING_ITEMS.remove(event.getEntity().getUUID());
-    }
-
-    private static Component createShownItem(ItemStack stack, boolean leadingSpace) {
-        return createShownItem(stack, leadingSpace, true);
-    }
-
-    private static Component createShownItem(ItemStack stack, boolean leadingSpace, boolean includeCount) {
-        Component itemName = stack.getHoverName().copy();
-        ChatFormatting rarityColor;
-        Rarity rarity = stack.getRarity();
-        switch (rarity) {
-            case UNCOMMON -> rarityColor = ChatFormatting.YELLOW;
-            case RARE -> rarityColor = ChatFormatting.AQUA;
-            case EPIC -> rarityColor = ChatFormatting.LIGHT_PURPLE;
-            default -> rarityColor = ChatFormatting.WHITE;
-        }
-
-        Component itemColored = itemName.copy().withStyle(style -> style.withColor(rarityColor).withItalic(Boolean.FALSE));
-        Component leftBracket = Component.literal("[").withStyle(s -> s.withColor(ChatFormatting.GRAY).withItalic(Boolean.FALSE));
-        Component rightBracket = Component.literal("]").withStyle(s -> s.withColor(ChatFormatting.GRAY).withItalic(Boolean.FALSE));
-        Component shown = Component.literal(leadingSpace ? " " : "")
-                .append(leftBracket)
-                .append(itemColored)
-                .append(rightBracket);
-
-        ItemStack hoverStack = stack.copy();
-        hoverStack.setCount(Math.min(stack.getCount(), Math.min(stack.getMaxStackSize(), MAX_SHOW_ITEM_HOVER_COUNT)));
-        HoverEvent.ItemStackInfo info = new HoverEvent.ItemStackInfo(hoverStack);
-        shown = shown.copy().withStyle(s -> s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, info)));
-        if (includeCount && stack.getCount() > 1) {
-            shown = shown.copy().append(Component.literal(" x" + stack.getCount())
-                    .withStyle(ChatFormatting.GRAY));
-        }
-        return shown;
-    }
-
-    public static void sendShowItemToServer(int slotIndex) {
-        PacketDistributor.sendToServer(new ItemPeekPayload(slotIndex));
-    }
-
-    private record PendingItem(ItemStack stack, String marker) {}
+    private static ItemPeekConfigSnapshot cfg(){return ItemPeekConfigService.snapshot();}
+    private static boolean validText(String s,int max){return s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl);}
+    private static boolean bypass(ServerPlayer p){return p.createCommandSourceStack().hasPermission(cfg().bypassPermissionLevel());}
+    private static void ensureConfig(ServerPlayer p){if(ItemPeekConfigService.path()==null)ItemPeekConfigService.initialize(p.server);}
+    private static void handleShowItem(ServerPlayer p,int slot){ensureConfig(p);ItemPeekConfigSnapshot c=cfg();if(!c.globalEnabled()){blocked(p,"message.itempeek.disabled");return;}if(slot<0||slot>=p.containerMenu.slots.size())return;ItemStack stack=p.containerMenu.getSlot(slot).getItem();if(stack.isEmpty()){blocked(p,"message.itempeek.no_item");return;}if(!allow(p,stack,"global"))return;Component shown=createShownItem(stack,true,true);Component msg=Component.translatable(stack.getCount()>1?"message.itempeek.shows_item_count":"message.itempeek.shows_item",p.getName(),shown,stack.getCount()).withStyle(ChatFormatting.GRAY);for(ServerPlayer target:p.server.getPlayerList().getPlayers())target.sendSystemMessage(msg);}
+    private static boolean allow(ServerPlayer p,ItemStack stack,String kind){ItemPeekConfigSnapshot c=cfg();if(bypass(p))return true;long now=System.currentTimeMillis();var result=LIMITER.checkAndRecord(p.getUUID(),now,false,c.cooldownEnabled(),c.cooldownMillis(),c.windowLimit(),c.windowMillis(),c.duplicateProtection(),c.duplicateWindowMillis(),kind+":"+stack.getHoverName().getString());if(result==ItemPeekRateLimiter.Result.ALLOWED)return true;blocked(p,result==ItemPeekRateLimiter.Result.COOLDOWN?"message.itempeek.cooldown":result==ItemPeekRateLimiter.Result.WINDOW?"message.itempeek.rate_limit":"message.itempeek.duplicate");return false;}
+    private static void prepare(ServerPlayer p,int slot,String marker){ensureConfig(p);ItemPeekConfigSnapshot c=cfg();if(!c.chatEnabled()||slot<0||slot>=p.containerMenu.slots.size()||!validText(marker,256))return;ItemStack stack=p.containerMenu.getSlot(slot).getItem();if(stack.isEmpty())return;PENDING.put(p.getUUID(),new PendingItem(stack.copy(),marker,System.currentTimeMillis()));}
+    public static void onServerChat(ServerChatEvent event){ServerPlayer p=event.getPlayer();ensureConfig(p);PendingItem pending=PENDING.get(p.getUUID());if(pending==null)return;ItemPeekConfigSnapshot c=cfg();if(System.currentTimeMillis()-pending.created()>c.pendingTtlMillis()){PENDING.remove(p.getUUID(),pending);blocked(p,"message.itempeek.pending_expired");return;}String raw=event.getRawText();if(!validText(raw,c.maxMessageLength())){PENDING.remove(p.getUUID(),pending);return;}int at=raw.indexOf(pending.marker());if(at<0)return; if(!allow(p,pending.stack(),"chat"))return;Component message=Component.literal(raw.substring(0,at)).append(createShownItem(pending.stack(),false,true)).append(raw.substring(at+pending.marker().length()));if(BEAUTIFIED.broadcast(p,message))event.setCanceled(true);else event.setMessage(message);PENDING.remove(p.getUUID(),pending);}
+    private static void privateMessage(ServerPlayer sender,String targets,String message){ensureConfig(sender);ItemPeekConfigSnapshot c=cfg();PendingItem pending=PENDING.get(sender.getUUID());if(!c.privateEnabled()||pending==null||!validText(targets,c.maxTargetLength())||!validText(message,c.maxMessageLength()))return;if(System.currentTimeMillis()-pending.created()>c.pendingTtlMillis()){PENDING.remove(sender.getUUID(),pending);blocked(sender,"message.itempeek.pending_expired");return;}int at=message.indexOf(pending.marker());if(at<0)return;Collection<ServerPlayer> targetsFound;try{var source=sender.createCommandSourceStack();targetsFound=EntityArgument.players().parse(new StringReader(targets),source).findPlayers(source);if(targetsFound.isEmpty())throw EntityArgument.NO_PLAYERS_FOUND.create();}catch(CommandSyntaxException e){sender.sendSystemMessage(Component.translatable("message.itempeek.invalid_target").withStyle(ChatFormatting.RED));return;}if(!allow(sender,pending.stack(),"private"))return;Component content=Component.literal(message.substring(0,at)).append(createShownItem(pending.stack(),false,true)).append(message.substring(at+pending.marker().length()));var source=sender.createCommandSourceStack();for(ServerPlayer target:targetsFound){ChatType.Bound out=ChatType.bind(ChatType.MSG_COMMAND_OUTGOING,source).withTargetName(target.getDisplayName());sender.sendSystemMessage(out.decorate(content));target.sendSystemMessage(ChatType.bind(ChatType.MSG_COMMAND_INCOMING,source).decorate(content));}PENDING.remove(sender.getUUID(),pending);}
+    private static void blocked(ServerPlayer p,String key){p.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.RED));}
+    @SubscribeEvent public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e){PENDING.remove(e.getEntity().getUUID());LIMITER.clear(e.getEntity().getUUID());}
+    public static void reset(UUID id){LIMITER.clear(id);}
+    public static void resetAll(){LIMITER.clearAll();}
+    public static int stateCount(UUID id){return LIMITER.count(id);}
+    private static Component createShownItem(ItemStack stack,boolean leading,boolean count){Component name=stack.getHoverName().copy();ChatFormatting color=switch(stack.getRarity()){case UNCOMMON->ChatFormatting.YELLOW;case RARE->ChatFormatting.AQUA;case EPIC->ChatFormatting.LIGHT_PURPLE;default->ChatFormatting.WHITE;};MutableComponent shown=Component.literal(leading?" ":"").append(Component.literal("[")).append(name.copy().withStyle(s->s.withColor(color).withItalic(false))).append(Component.literal("]"));ItemStack hover=stack.copy();hover.setCount(Math.min(stack.getCount(),Math.min(stack.getMaxStackSize(),MAX_SHOW_ITEM_HOVER_COUNT)));shown.withStyle(s->s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM,new HoverEvent.ItemStackInfo(hover))));if(count&&stack.getCount()>1)shown.append(Component.literal(" x"+stack.getCount()).withStyle(ChatFormatting.GRAY));return shown;}
+    public static void sendShowItemToServer(int slot){PacketDistributor.sendToServer(new ItemPeekPayload(slot));}
+    private record PendingItem(ItemStack stack,String marker,long created){}
 }

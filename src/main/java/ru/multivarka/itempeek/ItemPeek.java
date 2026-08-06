@@ -15,5 +15,6 @@ public class ItemPeek {
         Network.init();
         NeoForge.EVENT_BUS.addListener(Network::onServerChat);
         NeoForge.EVENT_BUS.addListener(Network::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(ItemPeekCommands::register);
     }
 }

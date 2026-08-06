@@ -1,22 +1,41 @@
 # Item Peek
 
-A NeoForge mod for Minecraft 1.21.1 that lets players showcase inventory items directly in chat.
+NeoForge 1.21.1 mod for showing inventory items in chat. Shift+T broadcasts an item and Shift+Y prepares an item for normal or private chat. Vanilla `/msg`, `/tell`, `/w` and namespaced forms are supported.
 
-## Features
-- Press **Shift + T** while hovering an item in any container screen to broadcast it.
-- Press **Shift + Y** to insert the hovered item into chat, then add any text before sending.
-- Inserted items also work in private messages sent with **/msg**, **/tell**, or **/w**.
-- Chat message includes the item name, quantity, and rarity color, visible to all players on the server.
-- Hovering over the chat entry shows the full item tooltip.
-- Both key bindings can be changed in Minecraft controls.
-- Standard NeoForge mod-list metadata and config screen integration for catalogue-style mod menus.
-- English and Russian localization.
+## Server protection
 
-## Usage
-1. Open your inventory or any container (chest, furnace, etc.).
-2. Hover over the item you want to display.
-3. Hold **Shift** and press the configured quick-send key (default **T**) to broadcast immediately.
-4. Alternatively, press the configured insert key (default **Y**) while holding **Shift**, add text in chat, and send normally.
+Item Peek uses a server-side shared sliding-window limiter for quick broadcasts, public item messages and private item messages. Defaults are a 3-second cooldown, 5 messages per 10 seconds, duplicate protection for 5 seconds, and a 15-second pending-item TTL. Ordinary chat without an item is unaffected. State is keyed by player UUID and cleared on logout.
+
+The runtime file is `serverconfig/itempeek-server.properties`. It is loaded when the server starts and can be safely reloaded/saved without restarting. Main options include `cooldownEnabled`, `cooldownMillis`, `windowLimit`, `windowMillis`, `duplicateProtection`, `duplicateWindowMillis`, `bypassPermissionLevel`, `globalEnabled`, `chatEnabled`, `privateEnabled`, `pendingTtlMillis`, `maxMessageLength`, `maxTargetLength`, `maxPendingPerPlayer`, and `privateAliases`.
+
+Operators at `bypassPermissionLevel` (default 2) bypass anti-spam. The same level protects administration commands. No permission mod is required.
+
+## Administration
+
+Commands apply changes immediately unless stated otherwise:
+
+```
+/itempeek config list
+/itempeek config get cooldownMillis
+/itempeek config set cooldownMillis 5000
+/itempeek config reset-all
+/itempeek config reload
+/itempeek config save
+/itempeek antispam status PlayerName
+/itempeek antispam reset PlayerName
+/itempeek antispam reset-all
+/itempeek private-commands list
+/itempeek private-commands add whisper
+/itempeek private-commands remove whisper
+/itempeek private-commands reset
+```
+
+Private aliases are normalized to lowercase identifiers, deduplicated and validated. Custom aliases must describe a command with the normal target-then-message shape; aliases do not change the server's command semantics. The client-side chat screen currently recognizes the vanilla aliases until the client is restarted after an alias change.
+
+## Optional integrations and Catalogue
+
+Beautified Chat Server is optional. Its reflection API is discovered once, cached, and disabled after a runtime failure; standard Minecraft formatting remains available. Catalogue is also optional and is not a dependency. Branding metadata points to `assets/itempeek/icon.png`.
 
 ## License
+
 MIT.
