@@ -33,6 +33,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import ru.multivarka.itempeek.config.ItemPeekConfigService;
+import ru.multivarka.itempeek.config.ItemPeekConfigSnapshot;
 
 @Mod.EventBusSubscriber(modid = ItemPeek.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class Network {
@@ -52,6 +54,23 @@ public final class Network {
     public static void reset(UUID id) { LIMITER.clear(id); }
     public static void resetAll() { LIMITER.clearAll(); }
     public static int stateCount(UUID id) { return LIMITER.count(id); }
+    private static ItemPeekConfigSnapshot config(ServerPlayer player) {
+        if (ItemPeekConfigService.path() == null) ItemPeekConfigService.initialize(player.server);
+        return ItemPeekConfigService.snapshot();
+    }
+    private static boolean allow(ServerPlayer player, ItemStack stack, String action) {
+        ItemPeekConfigSnapshot c = config(player);
+        if (player.createCommandSourceStack().hasPermission(c.bypassPermissionLevel())) return true;
+        var result = LIMITER.checkAndRecord(player.getUUID(), System.currentTimeMillis(), false,
+                c.cooldownEnabled(), c.cooldownMillis(), c.windowLimit(), c.windowMillis(),
+                c.duplicateProtection(), c.duplicateWindowMillis(), action + ":" + stack.getHoverName().getString());
+        if (result == ru.multivarka.itempeek.spam.ItemPeekRateLimiter.Result.ALLOWED) return true;
+        String key = result == ru.multivarka.itempeek.spam.ItemPeekRateLimiter.Result.COOLDOWN
+                ? "message.itempeek.cooldown" : result == ru.multivarka.itempeek.spam.ItemPeekRateLimiter.Result.DUPLICATE
+                ? "message.itempeek.duplicate" : "message.itempeek.rate_limit";
+        player.sendSystemMessage(Component.translatable(key).withStyle(ChatFormatting.RED));
+        return false;
+    }
 
     public static void init() {
         int id = 0;
@@ -87,6 +106,8 @@ public final class Network {
     }
 
     private static void handleShowItem(ServerPlayer player, int slotIndex) {
+        ItemPeekConfigSnapshot config = config(player);
+        if (!config.globalEnabled()) return;
         if (slotIndex < 0 || slotIndex >= player.containerMenu.slots.size()) {
             return;
         }
@@ -96,6 +117,7 @@ public final class Network {
             player.sendSystemMessage(Component.translatable("message.itempeek.no_item").withStyle(ChatFormatting.RED));
             return;
         }
+        if (!allow(player, stack, "global")) return;
 
         Component shown = createShownItem(stack, true, false);
 
@@ -125,6 +147,7 @@ public final class Network {
 
     @SubscribeEvent
     public static void onServerChat(ServerChatEvent event) {
+        if (!config(event.getPlayer()).chatEnabled()) return;
         PendingItem pending = PENDING_ITEMS.remove(event.getPlayer().getUUID());
         if (pending == null) {
             return;
@@ -135,6 +158,7 @@ public final class Network {
         if (markerIndex < 0) {
             return;
         }
+        if (!allow(event.getPlayer(), pending.stack(), "chat")) return;
 
         String before = rawText.substring(0, markerIndex);
         String after = rawText.substring(markerIndex + pending.marker().length());
@@ -250,6 +274,7 @@ public final class Network {
     }
 
     private static void sendPrivateItemMessage(ServerPlayer sender, String targetsText, String message) {
+        if (!config(sender).privateEnabled()) return;
         PendingItem pending = PENDING_ITEMS.remove(sender.getUUID());
         if (pending == null || targetsText.isBlank() || message.length() > 256) {
             return;
@@ -259,6 +284,7 @@ public final class Network {
         if (markerIndex < 0) {
             return;
         }
+        if (!allow(sender, pending.stack(), "private")) return;
 
         Component content = Component.literal(message.substring(0, markerIndex))
                 .append(createShownItem(pending.stack(), false))
