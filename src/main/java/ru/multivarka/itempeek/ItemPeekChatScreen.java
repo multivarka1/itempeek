@@ -2,7 +2,7 @@ package ru.multivarka.itempeek;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import ru.multivarka.itempeek.chat.ParsedPrivateMessage;
 import ru.multivarka.itempeek.chat.PrivateMessageCommandParser;
@@ -15,7 +15,7 @@ public final class ItemPeekChatScreen extends ChatScreen {
     private final String marker;
 
     public ItemPeekChatScreen(String marker) {
-        super(marker + " ");
+        super(marker + " ", false);
         this.marker = marker;
     }
 
@@ -32,12 +32,12 @@ public final class ItemPeekChatScreen extends ChatScreen {
             Minecraft.getInstance().gui.getChat().addRecentChat(normalized);
         }
 
-        PacketDistributor.sendToServer(new PrivateItemMessagePayload(parsed.target(), parsed.message()));
+        ClientPacketDistributor.sendToServer(new PrivateItemMessagePayload(parsed.target(), parsed.message()));
     }
 
     @Override
     public void removed() {
-        PacketDistributor.sendToServer(ClearPendingItemPayload.INSTANCE);
+        ClientPacketDistributor.sendToServer(ClearPendingItemPayload.INSTANCE);
         super.removed();
     }
 }
