@@ -154,6 +154,28 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 // Include the output of "generateModMetadata" as an input directory for the build
 // this works with both building through Gradle and the IDE.
 sourceSets.main.resources.srcDir generateModMetadata
+abstract class VerifyBrandingTask extends DefaultTask {
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ConfigurableFileCollection getBrandingFiles()
+    @InputFile abstract RegularFileProperty getMetadataFile()
+
+    @TaskAction
+    void verifyBranding() {
+        def image = brandingFiles.singleFile
+        def signature = image.bytes[0..7].collect { it & 0xff }
+        if (!image.exists() || image.length() < 8 || signature != [137,80,78,71,13,10,26,10]) throw new GradleException("Invalid branding PNG: ${image}")
+        def decoded = javax.imageio.ImageIO.read(image)
+        if (decoded == null || decoded.width != 400 || decoded.height != 400) throw new GradleException('Unexpected icon.png dimensions')
+        def metadata = metadataFile.get().asFile
+        if (!metadata.exists() || !metadata.text.contains('logoFile="assets/itempeek/icon.png"')) throw new GradleException('Branding metadata is incomplete')
+    }
+}
+tasks.register('verifyBranding', VerifyBrandingTask) {
+    dependsOn processResources
+    brandingFiles.from(layout.projectDirectory.file('src/main/resources/assets/itempeek/icon.png'))
+    metadataFile.set(layout.buildDirectory.file('resources/main/META-INF/neoforge.mods.toml'))
+}
+tasks.named('check').configure { dependsOn verifyBranding }
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 

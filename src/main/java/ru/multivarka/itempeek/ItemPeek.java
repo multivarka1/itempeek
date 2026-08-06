@@ -17,5 +17,6 @@ public class ItemPeek {
         modEventBus.addListener(Network::registerPayloads);
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, Network::onServerChat);
         NeoForge.EVENT_BUS.addListener(Network::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(ItemPeekCommands::register);
     }
 }
