@@ -29,7 +29,7 @@ public final class ItemPeekChatScreen extends ChatScreen {
         }
 
         if (addToRecent) {
-            Minecraft.getInstance().gui.getChat().addRecentChat(normalized);
+            Minecraft.getInstance().gui.hud.getChat().addRecentChat(normalized);
         }
 
         ClientPacketDistributor.sendToServer(new PrivateItemMessagePayload(parsed.target(), parsed.message()));
