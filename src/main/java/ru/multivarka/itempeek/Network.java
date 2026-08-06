@@ -12,10 +12,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import ru.multivarka.itempeek.compat.BeautifiedChatCompat;
 import ru.multivarka.itempeek.config.ItemPeekConfigService;
@@ -24,7 +22,6 @@ import ru.multivarka.itempeek.spam.ItemPeekRateLimiter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@EventBusSubscriber(modid = ItemPeek.MODID, bus = EventBusSubscriber.Bus.MOD)
 public final class Network {
     private static final int MAX_SHOW_ITEM_HOVER_COUNT=99;
     private static final Map<UUID,PendingItem> PENDING=new ConcurrentHashMap<>();
@@ -40,9 +37,9 @@ public final class Network {
     }
     private static ItemPeekConfigSnapshot cfg(){return ItemPeekConfigService.snapshot();}
     private static boolean validText(String s,int max){return s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl);}
-    private static boolean bypass(ServerPlayer p){return p.createCommandSourceStack().hasPermission(cfg().bypassPermissionLevel());}
-    private static void ensureConfig(ServerPlayer p){if(ItemPeekConfigService.path()==null)ItemPeekConfigService.initialize(p.server);}
-    private static void handleShowItem(ServerPlayer p,int slot){ensureConfig(p);ItemPeekConfigSnapshot c=cfg();if(!c.globalEnabled()){blocked(p,"message.itempeek.disabled");return;}if(slot<0||slot>=p.containerMenu.slots.size())return;ItemStack stack=p.containerMenu.getSlot(slot).getItem();if(stack.isEmpty()){blocked(p,"message.itempeek.no_item");return;}if(!allow(p,stack,"global"))return;Component shown=createShownItem(stack,true,true);Component msg=Component.translatable(stack.getCount()>1?"message.itempeek.shows_item_count":"message.itempeek.shows_item",p.getName(),shown,stack.getCount()).withStyle(ChatFormatting.GRAY);for(ServerPlayer target:p.server.getPlayerList().getPlayers())target.sendSystemMessage(msg);}
+    private static boolean bypass(ServerPlayer p){return p.permissions() instanceof net.minecraft.server.permissions.LevelBasedPermissionSet permissions && permissions.level().isEqualOrHigherThan(net.minecraft.server.permissions.PermissionLevel.byId(cfg().bypassPermissionLevel()));}
+    private static void ensureConfig(ServerPlayer p){if(ItemPeekConfigService.path()==null)ItemPeekConfigService.initialize(p.level().getServer());}
+    private static void handleShowItem(ServerPlayer p,int slot){ensureConfig(p);ItemPeekConfigSnapshot c=cfg();if(!c.globalEnabled()){blocked(p,"message.itempeek.disabled");return;}if(slot<0||slot>=p.containerMenu.slots.size())return;ItemStack stack=p.containerMenu.getSlot(slot).getItem();if(stack.isEmpty()){blocked(p,"message.itempeek.no_item");return;}if(!allow(p,stack,"global"))return;Component shown=createShownItem(stack,true,true);Component msg=Component.translatable(stack.getCount()>1?"message.itempeek.shows_item_count":"message.itempeek.shows_item",p.getName(),shown,stack.getCount()).withStyle(ChatFormatting.GRAY);for(ServerPlayer target:p.level().getServer().getPlayerList().getPlayers())target.sendSystemMessage(msg);}
     private static boolean allow(ServerPlayer p,ItemStack stack,String kind){ItemPeekConfigSnapshot c=cfg();if(bypass(p))return true;long now=System.currentTimeMillis();var result=LIMITER.checkAndRecord(p.getUUID(),now,false,c.cooldownEnabled(),c.cooldownMillis(),c.windowLimit(),c.windowMillis(),c.duplicateProtection(),c.duplicateWindowMillis(),kind+":"+stack.getHoverName().getString());if(result==ItemPeekRateLimiter.Result.ALLOWED)return true;blocked(p,result==ItemPeekRateLimiter.Result.COOLDOWN?"message.itempeek.cooldown":result==ItemPeekRateLimiter.Result.WINDOW?"message.itempeek.rate_limit":"message.itempeek.duplicate");return false;}
     private static void prepare(ServerPlayer p,int slot,String marker){ensureConfig(p);ItemPeekConfigSnapshot c=cfg();if(!c.chatEnabled()||slot<0||slot>=p.containerMenu.slots.size()||!validText(marker,256))return;ItemStack stack=p.containerMenu.getSlot(slot).getItem();if(stack.isEmpty())return;PENDING.put(p.getUUID(),new PendingItem(stack.copy(),marker,System.currentTimeMillis()));}
     public static void onServerChat(ServerChatEvent event){ServerPlayer p=event.getPlayer();ensureConfig(p);PendingItem pending=PENDING.get(p.getUUID());if(pending==null)return;ItemPeekConfigSnapshot c=cfg();if(System.currentTimeMillis()-pending.created()>c.pendingTtlMillis()){PENDING.remove(p.getUUID(),pending);blocked(p,"message.itempeek.pending_expired");return;}String raw=event.getRawText();if(!validText(raw,c.maxMessageLength())){PENDING.remove(p.getUUID(),pending);return;}int at=raw.indexOf(pending.marker());if(at<0)return; if(!allow(p,pending.stack(),"chat"))return;Component message=Component.literal(raw.substring(0,at)).append(createShownItem(pending.stack(),false,true)).append(raw.substring(at+pending.marker().length()));if(BEAUTIFIED.broadcast(p,message))event.setCanceled(true);else event.setMessage(message);PENDING.remove(p.getUUID(),pending);}
@@ -52,7 +49,6 @@ public final class Network {
     public static void reset(UUID id){LIMITER.clear(id);}
     public static void resetAll(){LIMITER.clearAll();}
     public static int stateCount(UUID id){return LIMITER.count(id);}
-    private static Component createShownItem(ItemStack stack,boolean leading,boolean count){Component name=stack.getHoverName().copy();ChatFormatting color=switch(stack.getRarity()){case UNCOMMON->ChatFormatting.YELLOW;case RARE->ChatFormatting.AQUA;case EPIC->ChatFormatting.LIGHT_PURPLE;default->ChatFormatting.WHITE;};MutableComponent shown=Component.literal(leading?" ":"").append(Component.literal("[")).append(name.copy().withStyle(s->s.withColor(color).withItalic(false))).append(Component.literal("]"));ItemStack hover=stack.copy();hover.setCount(Math.min(stack.getCount(),Math.min(stack.getMaxStackSize(),MAX_SHOW_ITEM_HOVER_COUNT)));shown.withStyle(s->s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM,new HoverEvent.ItemStackInfo(hover))));if(count&&stack.getCount()>1)shown.append(Component.literal(" x"+stack.getCount()).withStyle(ChatFormatting.GRAY));return shown;}
-    public static void sendShowItemToServer(int slot){PacketDistributor.sendToServer(new ItemPeekPayload(slot));}
+    private static Component createShownItem(ItemStack stack,boolean leading,boolean count){Component name=stack.getHoverName().copy();ChatFormatting color=switch(stack.getRarity()){case UNCOMMON->ChatFormatting.YELLOW;case RARE->ChatFormatting.AQUA;case EPIC->ChatFormatting.LIGHT_PURPLE;default->ChatFormatting.WHITE;};MutableComponent shown=Component.literal(leading?" ":"").append(Component.literal("[")).append(name.copy().withStyle(s->s.withColor(color).withItalic(false))).append(Component.literal("]"));ItemStack hover=stack.copy();hover.setCount(Math.min(stack.getCount(),Math.min(stack.getMaxStackSize(),MAX_SHOW_ITEM_HOVER_COUNT)));shown.withStyle(s->s.withHoverEvent(new HoverEvent.ShowItem(net.minecraft.world.item.ItemStackTemplate.fromNonEmptyStack(hover))));if(count&&stack.getCount()>1)shown.append(Component.literal(" x"+stack.getCount()).withStyle(ChatFormatting.GRAY));return shown;}
     private record PendingItem(ItemStack stack,String marker,long created){}
 }
