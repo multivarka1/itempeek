@@ -18,5 +18,11 @@
 
   "message.itempeek.no_item": "You are not holding any item",
   "message.itempeek.shows_item": "%s shows %s",
-  "message.itempeek.shows_item_count": "%s shows %s x%s"
+  "message.itempeek.shows_item_count": "%s shows %s x%s",
+  "message.itempeek.disabled": "This Item Peek feature is disabled by the server",
+  "message.itempeek.cooldown": "Please wait before showing another item",
+  "message.itempeek.rate_limit": "Item Peek rate limit exceeded",
+  "message.itempeek.duplicate": "That item message was recently sent",
+  "message.itempeek.pending_expired": "The prepared item has expired",
+  "message.itempeek.invalid_target": "The private-message target is invalid"
 }
