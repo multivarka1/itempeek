@@ -7,7 +7,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
-import org.lwjgl.glfw.GLFW;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -63,15 +62,15 @@ public class ItemPeekClient {
                 "key.itempeek.show_item",
                 KeyConflictContext.GUI,
                 KeyModifier.SHIFT,
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_T,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_T,
                 ITEMPEEK_CATEGORY);
         INSERT_ITEM_KEY = new KeyMapping(
                 "key.itempeek.insert_item",
                 KeyConflictContext.GUI,
                 KeyModifier.SHIFT,
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_Y,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_Y,
                 ITEMPEEK_CATEGORY);
         event.register(SHOW_ITEM_KEY);
         event.register(INSERT_ITEM_KEY);
@@ -112,7 +111,7 @@ public class ItemPeekClient {
     }
 
     public static void onKeyInput(InputEvent.Key event) {
-        if (event.getAction() != GLFW.GLFW_PRESS) return;
+        if (event.getAction() != InputConstants.PRESS) return;
 
         normalizeLegacyKeyModifiers();
 
@@ -135,12 +134,12 @@ public class ItemPeekClient {
     }
 
     private static boolean matches(InputEvent.Key event, KeyMapping keyMapping) {
-        return keyMapping != null && keyMapping.isActiveAndMatches(InputConstants.Type.KEYSYM.getOrCreate(event.getKey()));
+        return keyMapping != null && keyMapping.isActiveAndMatches(InputConstants.Type.KEYBOARD.getOrCreate(event.getKey()));
     }
 
     private static void normalizeLegacyKeyModifiers() {
-        normalizeLegacyKeyModifier(SHOW_ITEM_KEY, GLFW.GLFW_KEY_T);
-        normalizeLegacyKeyModifier(INSERT_ITEM_KEY, GLFW.GLFW_KEY_Y);
+        normalizeLegacyKeyModifier(SHOW_ITEM_KEY, InputConstants.KEY_T);
+        normalizeLegacyKeyModifier(INSERT_ITEM_KEY, InputConstants.KEY_Y);
     }
 
     private static void normalizeLegacyKeyModifier(KeyMapping keyMapping, int defaultKey) {

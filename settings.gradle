@@ -1,9 +1,16 @@
 pluginManagement {
     repositories {
+        // Fallback for environments where plugins.gradle.org is unreachable.
+        maven {
+            name = 'GradlePluginMirror'
+            url = uri('https://maven.aliyun.com/repository/gradle-plugin')
+        }
+        // Resolve NeoForge's Gradle plugin directly from the official Maven
+        // repository, avoiding the plugins-artifacts.gradle.org redirect.
+        maven {
+            name = 'NeoForged'
+            url = uri('https://maven.neoforged.net/releases')
+        }
         gradlePluginPortal()
     }
-}
-
-plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
 }

@@ -1,6 +1,6 @@
 # Item Peek
 
-NeoForge 1.21.1 mod for showing inventory items in chat. Shift+T broadcasts an item and Shift+Y prepares an item for normal or private chat. Vanilla `/msg`, `/tell`, `/w` and namespaced forms are supported.
+NeoForge 26.3 mod for showing inventory items in chat. Shift+T broadcasts an item and Shift+Y prepares an item for normal or private chat. Vanilla `/msg`, `/tell`, `/w` and namespaced forms are supported.
 
 ## Server protection
 
