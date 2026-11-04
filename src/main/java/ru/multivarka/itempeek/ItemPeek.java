@@ -11,6 +11,7 @@ import net.neoforged.neoforge.common.NeoForge;
 @Mod(ItemPeek.MODID)
 public class ItemPeek {
     public static final String MODID = "itempeek";
+    public static final String ITEM_ICON_SPACER = "    ";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ItemPeek(IEventBus modEventBus, ModContainer container) {
