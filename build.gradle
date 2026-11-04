@@ -18,6 +18,7 @@ version = mod_version
 group = mod_group_id
 
 repositories {
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
     // Add here additional repositories if required by some of the dependencies below.
 }
 
@@ -112,6 +113,8 @@ configurations {
 }
 
 dependencies {
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
