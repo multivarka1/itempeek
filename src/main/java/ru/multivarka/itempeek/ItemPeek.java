@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 @Mod(ItemPeek.MODID)
 public class ItemPeek {
     public static final String MODID = "itempeek";
+    public static final String ITEM_ICON_SPACER = "    ";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     // Forge requires a no-arg constructor for @Mod classes

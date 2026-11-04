@@ -8,10 +8,10 @@ import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Rarity;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -320,27 +320,21 @@ public final class Network {
 
     private static Component createShownItem(ItemStack stack, boolean leadingSpace, boolean includeCount) {
         Component itemName = stack.getHoverName().copy();
-        ChatFormatting rarityColor;
-        Rarity rarity = stack.getRarity();
-        switch (rarity) {
-            case UNCOMMON -> rarityColor = ChatFormatting.YELLOW;
-            case RARE -> rarityColor = ChatFormatting.AQUA;
-            case EPIC -> rarityColor = ChatFormatting.LIGHT_PURPLE;
-            default -> rarityColor = ChatFormatting.WHITE;
+        Style nameStyle = itemName.getStyle();
+        if (nameStyle.getColor() == null) {
+            itemName = itemName.copy().withStyle(stack.getRarity().getStyleModifier());
         }
-
-        Component itemColored = itemName.copy().withStyle(style -> style.withColor(rarityColor).withItalic(Boolean.FALSE));
-        Component leftBracket = Component.literal("[").withStyle(s -> s.withColor(ChatFormatting.GRAY).withItalic(Boolean.FALSE));
-        Component rightBracket = Component.literal("]").withStyle(s -> s.withColor(ChatFormatting.GRAY).withItalic(Boolean.FALSE));
-        Component shown = Component.literal(leadingSpace ? " " : "")
-                .append(leftBracket)
-                .append(itemColored)
-                .append(rightBracket);
+        itemName = itemName.copy().withStyle(style -> style.withItalic(false));
 
         ItemStack hoverStack = stack.copy();
         hoverStack.setCount(Math.min(stack.getCount(), Math.min(stack.getMaxStackSize(), MAX_SHOW_ITEM_HOVER_COUNT)));
         HoverEvent.ItemStackInfo info = new HoverEvent.ItemStackInfo(hoverStack);
-        shown = shown.copy().withStyle(s -> s.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, info)));
+        MutableComponent label = Component.literal(ItemPeek.ITEM_ICON_SPACER + "[")
+                .append(itemName)
+                .append(Component.literal("]"))
+                .withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, info)));
+        Component shown = Component.literal(leadingSpace ? " " : "").append(label);
+
         if (includeCount && stack.getCount() > 1) {
             shown = shown.copy().append(Component.literal(" x" + stack.getCount())
                     .withStyle(ChatFormatting.GRAY));
